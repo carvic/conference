@@ -1,20 +1,42 @@
+// Import libraries we need.
+import { default as Web3} from 'web3';
+import { default as contract } from 'truffle-contract'
+
+// Import our contract artifacts and turn them into usable abstractions.
+import conference_artifacts from '../../build/contracts/Conference.json'
+
+// MetaCoin is our usable abstraction, which we'll use through the code below.
+var Conference = contract(conference_artifacts);
+
+var Web3 = require('web3');
+var web3 = new Web3();
+
+
 var accounts, account;
 var myConferenceInstance;
 
 // Initialize
 function initializeConference() {
-	Conference.new({from: accounts[0], gas: 3141592}).then(
+
+	Conference.deployed().then(function(instance) {
+		myConferenceInstance = instance;
+	})
+
+
+	/* old style
+	Conference.new({from: account, gas: 3141592}).then(
 	function(conf) {
 		console.log(conf);
 		myConferenceInstance = conf;
 		$("#confAddress").html(myConferenceInstance.address);
 		checkValues();
 	});
+	*/
 }
 
 // Check Values
 function checkValues() {
-	myConferenceInstance.quota.call().then(
+	myConferenceInstance.deployed().quota.call().then(
 		function(quota) { 
 			$("input#confQuota").val(quota);
 			return myConferenceInstance.organizer.call();
@@ -31,7 +53,29 @@ function checkValues() {
 
 // Change Quota
 function changeQuota(val) {
-	myConferenceInstance.changeQuota(val, {from: accounts[0]}).then(
+
+/* new style
+
+    var conference;
+    Conference.deployed().then(function(instance) {
+      conference = instance;
+      return conference.changeQuota(val, {from: account});
+    }).then(
+		function(quota) {
+			if (quota == val) {
+				var msgResult;
+				msgResult = "Change successful";
+			} else {
+				msgResult = "Change failed";
+			}
+			$("#changeQuotaResult").html(msgResult);
+                       console.log(val);
+		});
+
+*/
+
+
+	myConferenceInstance.changeQuota(val, {from: account}).then(
 		function() {
 			return myConferenceInstance.quota.call();
 		}).then(
@@ -46,10 +90,16 @@ function changeQuota(val) {
 		});
 }
 
+
+
+
+
+
+
 // buyTicket
 function buyTicket(buyerAddress, ticketPrice) {
 
-	myConferenceInstance.buyTicket({ from: buyerAddress, value: ticketPrice }).then(
+	myConferenceInstance.buyTicket({gas: 140000, from: buyerAddress, value: ticketPrice }).then(
 		function() {
 			return myConferenceInstance.numRegistrants.call();
 		}).then(
@@ -79,7 +129,7 @@ function refundTicket(buyerAddress, ticketPrice) {
 				$("#refundTicketResult").html("Buyer is not registered - no refund!");
 			} else {		
 				myConferenceInstance.refundTicket(buyerAddress, 
-					ticketPrice, {from: accounts[0]}).then(
+					ticketPrice, {from: account}).then(
 					function() {
 						return myConferenceInstance.numRegistrants.call();
 					}).then(
@@ -150,16 +200,19 @@ function switchToHooked3(_keystore) {
 	var web3Provider = new HookedWeb3Provider({
 	  host: "http://localhost:8545", // check what using in truffle.js
 	  transaction_signer: _keystore
-	});
-
+	});       
+         
 	web3.setProvider(web3Provider);
+        web3.currentProvider = web3Provider;
+         
+        Conference.setProvider(web3Provider);
 }
 
 function fundEth(newAddress, amt) {
 
 	console.log("fundEth");
 
-	var fromAddr = accounts[0]; // default owner address of client
+	var fromAddr = account; // default owner address of client
 	var toAddr = newAddress;
 	var valueEth = amt;
 	var value = parseFloat(valueEth)*1.0e18;
@@ -174,6 +227,20 @@ function fundEth(newAddress, amt) {
 
 window.onload = function() {
 
+      //web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+    //web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
+    
+    web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+
+    web3.eth.defaultAccount = web3.eth.coinbase;
+    account = web3.eth.coinbase;
+
+    Conference.setProvider(web3.currentProvider);
+
+    initializeConference();
+
+/*
+
 	web3.eth.getAccounts(function(err, accs) {
     if (err != null) {
       alert("There was an error fetching your accounts.");
@@ -186,8 +253,14 @@ window.onload = function() {
     accounts = accs;
     account = accounts[0];
 
-  	initializeConference();
+    initializeConference();
+
+
+  	
   });
+*/
+
+
 
 	// Wire up the UI elements
 	$("#changeQuota").click(function() {
@@ -230,7 +303,7 @@ window.onload = function() {
 	});
 
 	// Set value of wallet to accounts[1]
-	$("#buyerAddress").val(accounts[1]);
-	$("#refBuyerAddress").val(accounts[1]);
+	//$("#buyerAddress").val(accounts[1]);
+       //$("#refBuyerAddress").val(accounts[1]);
 
 };
